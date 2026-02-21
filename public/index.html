@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Architecture Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #111113;
+    --surface: #19191b;
+    --surface2: #1e1e21;
+    --border: #2a2a2d;
+    --border-hover: #3a3a3d;
+    --text: #e0e0e0;
+    --text-muted: #777;
+    --text-dim: #555;
+    --accent: #e8e8e8;
+    --mono: 'Geist Mono', monospace;
+    --sans: 'Geist', -apple-system, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+  *::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; height: 100vh; }
+
+  /* ===== LAYOUT ===== */
+  #app { display: flex; height: 100vh; }
+
+  /* -- Left Nav -- */
+  #nav {
+    width: 52px; min-width: 52px; background: var(--bg);
+    border-right: 1px solid var(--border); display: flex;
+    flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; z-index: 20;
+  }
+  .nav-btn {
+    width: 36px; height: 36px; border: none; background: transparent;
+    color: var(--text-dim); cursor: pointer; /* no radius */
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--surface2); color: var(--text); }
+  .nav-btn.active { background: var(--surface2); color: var(--accent); }
+  .nav-spacer { flex: 1; }
+  .nav-divider { width: 24px; height: 1px; background: var(--border); margin: 8px 0; }
+
+  /* -- Left Panel -- */
+  #left-panel {
+    width: 280px; min-width: 280px; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex;
+    flex-direction: column; overflow: hidden;
+  }
+  #left-panel.collapsed { width: 0; min-width: 0; border: none; }
+
+  .panel-header {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+    padding: 16px 16px 12px; flex-shrink: 0;
+  }
+  .panel-section {
+    padding: 0 16px 16px; flex-shrink: 0;
+  }
+  .panel-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+
+  /* -- Center -- */
+  #center { flex: 1; display: flex; flex-direction: column; position: relative; }
+  #viewport-wrap { flex: 1; position: relative; background: var(--bg); }
+  #viewport-wrap canvas { width: 100%; height: 100%; display: block; }
+
+  /* Gallery mode */
+  #gallery-wrap {
+    flex: 1; overflow-y: auto; padding: 16px; display: none;
+     }
+  #gallery-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .gallery-card {
+    background: var(--surface); border: 1px solid var(--border);
+    /* no radius */ overflow: hidden; cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .gallery-card:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+  .gallery-card.favorited { border-color: #e8c84a; }
+  .gallery-card canvas { width: 100%; aspect-ratio: 1; display: block; background: #141416; }
+  .gallery-card-info {
+    padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .gallery-card-name {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  .gallery-card-actions { display: flex; gap: 6px; }
+  .card-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 13px; padding: 2px; transition: color 0.15s;
+  }
+  .card-btn:hover { color: var(--accent); }
+  .card-btn.fav-active { color: #e8c84a; }
+
+  /* -- Right Panel (AI Chat) -- */
+  #right-panel {
+    width: 360px; min-width: 360px; background: var(--surface);
+    border-left: 1px solid var(--border); display: flex; flex-direction: column;
+  }
+  #right-panel.collapsed { width: 0; min-width: 0; border: none; overflow: hidden; }
+
+  /* Tabs */
+  .tab-bar {
+    display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .tab-btn {
+    flex: 1; padding: 12px; font-family: var(--mono); font-size: 10px;
+    font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text-dim); background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--text-muted); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .tab-content.active { display: flex; }
+
+  /* Chat */
+  #chat-messages {
+    flex: 1; overflow-y: auto; padding: 16px; display: flex;
+    flex-direction: column; gap: 12px; scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+  .chat-msg {
+    max-width: 90%; padding: 10px 14px; /* no radius */
+    font-size: 13px; line-height: 1.5;
+  }
+  .chat-msg.user {
+    align-self: flex-end; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text);
+  }
+  .chat-msg.ai {
+    align-self: flex-start; background: transparent;
+    border: 1px solid var(--border); color: var(--text-muted);
+    font-style: italic;
+  }
+  .chat-msg.system {
+    align-self: center; color: var(--text-dim); font-size: 11px;
+    font-family: var(--mono); letter-spacing: 0.5px;
+  }
+
+  #chat-input-wrap {
+    padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  #chat-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 12px 14px; font-size: 13px; font-family: var(--mono);
+    /* no radius */ resize: none; min-height: 44px; max-height: 120px;
+    line-height: 1.4;
+  }
+  #chat-input:focus { outline: none; border-color: var(--border-hover); }
+  #chat-input::placeholder { color: var(--text-dim); }
+
+  /* Genome sliders */
+  .slider-group { margin-bottom: 16px; }
+  .slider-group-title {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px;
+    padding: 0 16px;
+  }
+  .slider-row {
+    display: flex; align-items: center; padding: 3px 16px; gap: 8px;
+  }
+  .slider-label {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+    width: 90px; min-width: 90px;
+  }
+  .slider-row input[type="range"] {
+    flex: 1; -webkit-appearance: none; background: #2a2a2d; height: 2px;
+    /* no radius */ outline: none;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 10px; height: 10px;
+    background: var(--text-muted); /* no radius */ cursor: pointer;
+    transition: background 0.15s;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb:hover { background: var(--accent); }
+  .slider-val {
+    font-family: var(--mono); font-size: 9px; color: var(--text-dim);
+    width: 28px; text-align: right;
+  }
+
+  /* Favorites */
+  #favorites-list { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .fav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    /* no radius */ cursor: pointer; transition: border-color 0.15s;
+  }
+  .fav-item:hover { border-color: var(--border-hover); }
+  .fav-thumb { width: 40px; height: 40px; /* no radius */ background: #141416; }
+  .fav-name { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--text-muted); }
+
+  /* -- Buttons -- */
+  .btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 8px 14px; font-size: 10px; font-family: var(--mono); cursor: pointer;
+    letter-spacing: 1px; text-transform: uppercase; /* no radius */
+    transition: all 0.15s; font-weight: 500;
+  }
+  .btn:hover { background: var(--border); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn.primary:hover { background: #fff; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-full { width: 100%; }
+  .btn-sm { padding: 5px 10px; font-size: 9px; }
+  .btn-row { display: flex; gap: 6px; }
+
+  /* -- Top Bar -- */
+  #topbar {
+    height: 44px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    background: var(--surface);
+  }
+  #topbar-left { display: flex; align-items: center; gap: 16px; }
+  #topbar-right { display: flex; align-items: center; gap: 8px; }
+  .topbar-title {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted);
+  }
+  .topbar-badge {
+    font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
+    padding: 2px 6px; background: var(--surface2); border: 1px solid var(--border);
+    /* no radius */ color: var(--text-dim);
+  }
+  .view-toggle { display: flex; border: 1px solid var(--border); /* no radius */ overflow: hidden; }
+  .view-btn {
+    padding: 5px 12px; font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+    text-transform: uppercase; background: transparent; border: none; color: var(--text-dim);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .view-btn:hover { color: var(--text-muted); }
+  .view-btn.active { background: var(--surface2); color: var(--accent); }
+
+  /* -- Viewport overlay -- */
+  #viewport-info {
+    position: absolute; top: 12px; left: 16px; display: flex; gap: 8px;
+    z-index: 5; pointer-events: none;
+  }
+  .info-badge {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+    padding: 4px 8px; background: rgba(17,17,19,0.7); border: 1px solid var(--border);
+    /* no radius */ color: var(--text-dim); backdrop-filter: blur(8px);
+  }
+  #viewport-controls {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 5;
+  }
+
+  /* -- Loading -- */
+  .spinner {
+    width: 14px; height: 14px; border: 1.5px solid var(--border);
+    border-top-color: var(--accent); /* no radius */
+    animation: spin 0.6s linear infinite; display: inline-block;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* -- Select -- */
+  select {
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 5px 8px; font-size: 10px; font-family: var(--mono); text-transform: uppercase;
+    letter-spacing: 0.5px; cursor: pointer;
+  }
+
+  /* -- Evolution section -- */
+  #evo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .evo-cell {
+    aspect-ratio: 1; background: #141416; border: 1.5px solid var(--border);
+    /* no radius */ cursor: pointer; position: relative; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .evo-cell canvas { width: 100%; height: 100%; display: block; }
+  .evo-cell.selected { border-color: var(--accent); }
+  .evo-cell:hover { border-color: var(--border-hover); }
+  .evo-label {
+    position: absolute; bottom: 4px; left: 6px; font-family: var(--mono);
+    font-size: 8px; letter-spacing: 1.5px; color: var(--text-dim);
+  }
+
+  /* -- Empty state -- */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; color: var(--text-dim); gap: 8px; padding: 32px;
+  }
+  .empty-state-icon { font-size: 24px; opacity: 0.3; }
+  .empty-state-text {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; text-align: center; line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Nav -->
+  <div id="nav">
+    <button class="nav-btn active" onclick="toggleLeftPanel()" title="Genome & Evolution">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="nav-btn" onclick="toggleRightPanel()" title="AI Chat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    </button>
+    <div class="nav-divider"></div>
+    <button class="nav-btn" onclick="randomGenome()" title="Random">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+    </button>
+    <button class="nav-btn" onclick="exportGLTF()" title="Export GLTF">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    </button>
+    <button class="nav-btn" onclick="exportScreenshot()" title="Screenshot">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+    </button>
+    <div class="nav-spacer"></div>
+    <button class="nav-btn" onclick="requestCritique()" title="AI Critique">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+    </button>
+  </div>
+
+  <!-- Left Panel -->
+  <div id="left-panel">
+    <div class="panel-header">Evolution Lab</div>
+    <div class="panel-section">
+      <div id="evo-grid">
+        <div class="evo-cell" data-idx="0" onclick="toggleEvoSelect(0)"><canvas></canvas><div class="evo-label">A</div></div>
+        <div class="evo-cell" data-idx="1" onclick="toggleEvoSelect(1)"><canvas></canvas><div class="evo-label">B</div></div>
+        <div class="evo-cell" data-idx="2" onclick="toggleEvoSelect(2)"><canvas></canvas><div class="evo-label">C</div></div>
+        <div class="evo-cell" data-idx="3" onclick="toggleEvoSelect(3)"><canvas></canvas><div class="evo-label">D</div></div>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn btn-sm" style="flex:1" onclick="breedSelected()">Breed</button>
+        <button class="btn btn-sm" style="flex:1" onclick="populateEvoGrid()">New Gen</button>
+      </div>
+    </div>
+
+    <div class="panel-header">Presets</div>
+    <div class="panel-section">
+      <div class="btn-row" style="flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="loadPreset('decon')">Decon</button>
+        <button class="btn btn-sm" onclick="loadPreset('brutal')">Brutal</button>
+        <button class="btn btn-sm" onclick="loadPreset('metabol')">Metabol</button>
+        <button class="btn btn-sm" onclick="loadPreset('hightech')">Hi-Tech</button>
+        <button class="btn btn-sm" onclick="loadPreset('parametric')">Param</button>
+        <button class="btn btn-sm" onclick="loadPreset('minimal')">Minimal</button>
+      </div>
+    </div>
+
+    <div class="panel-header">Genome</div>
+    <div class="panel-scroll" id="genome-panel"></div>
+  </div>
+
+  <!-- Center -->
+  <div id="center">
+    <div id="topbar">
+      <div id="topbar-left">
+        <span class="topbar-title">Architecture Studio</span>
+        <span class="topbar-badge" id="gen-badge">Gen 0</span>
+        <span class="topbar-badge" id="seed-badge">Seed —</span>
+      </div>
+      <div id="topbar-right">
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="single" onclick="setView('single')">Single</button>
+          <button class="view-btn" data-view="gallery" onclick="setView('gallery')">Gallery</button>
+        </div>
+        <select id="mood-select" onchange="setMood(this.value)">
+          <option value="day">Day</option>
+          <option value="dawn">Dawn</option>
+          <option value="dusk">Dusk</option>
+          <option value="night" selected>Night</option>
+          <option value="overcast">Overcast</option>
+          <option value="fog">Fog</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="viewport-wrap">
+      <canvas id="main-canvas"></canvas>
+      <div id="viewport-info">
+        <span class="info-badge" id="info-mood">Day</span>
+        <span class="info-badge" id="info-objects">0 objects</span>
+      </div>
+      <div id="viewport-controls">
+        <button class="btn btn-sm" onclick="setCameraPreset('orbit')">Orbit</button>
+        <button class="btn btn-sm" onclick="setCameraPreset('eye')">Eye Level</button>
+        <button class="btn btn-sm" onclick="setCameraPreset('top')">Plan</button>
+        <button class="btn btn-sm" onclick="setCameraPreset('front')">Front</button>
+        <button class="btn btn-sm" onclick="toggleRotation()">Pause</button>
+        <button class="btn btn-sm" onclick="toggleScale()">Scale Fig.</button>
+      </div>
+    </div>
+
+    <div id="gallery-wrap">
+      <div id="gallery-grid"></div>
+      <div style="padding:16px;text-align:center">
+        <button class="btn" onclick="batchGenerate()" id="btn-batch">Generate Batch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel (AI Chat) -->
+  <div id="right-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="setTab('chat')">Chat</button>
+      <button class="tab-btn" onclick="setTab('favorites')">Saved</button>
+    </div>
+
+    <div class="tab-content active" id="tab-chat">
+      <div id="chat-messages">
+        <div class="chat-msg system">Describe a building or ask for changes</div>
+      </div>
+      <div id="chat-input-wrap">
+        <textarea id="chat-input" placeholder="e.g. Make it more brutalist with less glass..." rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-favorites">
+      <div id="favorites-list" class="panel-scroll">
+        <div class="empty-state">
+          <div class="empty-state-icon">&#9734;</div>
+          <div class="empty-state-text">No saved buildings yet<br>Star buildings to save them here</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+// ======== GENOME ========
+const DEFAULT_GENOME = {
+  coreLevels: 5, coreWidth: 0.5, coreHeight: 0.5, coreDepth: 0.5,
+  coreOffset: 0.5, cantileverCount: 0.5, cantileverScale: 0.5,
+  slabCount: 0.5, slabScale: 0.5, verticalCount: 0.5, verticalHeight: 0.5,
+  beamCount: 0.5, detailDensity: 0.5, balconyCount: 0.5, diagonalCount: 0.5,
+  glassRatio: 0.4, wireframeDensity: 0.7, chaos: 0.5, verticality: 0.5,
+  density: 0.5, symmetryBias: 0.2, baseHue: 0, baseSaturation: 0,
+  baseBrightness: 0.87, glassOpacity: 0.25, environmentMood: "night"
+};
+
+const GENOME_GROUPS = {
+  "Structure": {
+    coreLevels: { min: 2, max: 9, step: 1, label: "Levels" },
+    coreWidth: { min: 0, max: 1, step: 0.01, label: "Width" },
+    coreHeight: { min: 0, max: 1, step: 0.01, label: "Height" },
+    coreDepth: { min: 0, max: 1, step: 0.01, label: "Depth" },
+    coreOffset: { min: 0, max: 1, step: 0.01, label: "Offset" },
+    verticality: { min: 0, max: 1, step: 0.01, label: "Vertical" },
+  },
+  "Elements": {
+    cantileverCount: { min: 0, max: 1, step: 0.01, label: "Cantilever" },
+    cantileverScale: { min: 0, max: 1, step: 0.01, label: "Cant. Size" },
+    slabCount: { min: 0, max: 1, step: 0.01, label: "Slabs" },
+    slabScale: { min: 0, max: 1, step: 0.01, label: "Slab Size" },
+    balconyCount: { min: 0, max: 1, step: 0.01, label: "Balconies" },
+    beamCount: { min: 0, max: 1, step: 0.01, label: "Beams" },
+  },
+  "Detail": {
+    verticalCount: { min: 0, max: 1, step: 0.01, label: "Verticals" },
+    verticalHeight: { min: 0, max: 1, step: 0.01, label: "Vert Hgt" },
+    detailDensity: { min: 0, max: 1, step: 0.01, label: "Density" },
+    diagonalCount: { min: 0, max: 1, step: 0.01, label: "Diagonals" },
+    wireframeDensity: { min: 0, max: 1, step: 0.01, label: "Wireframe" },
+  },
+  "Character": {
+    chaos: { min: 0, max: 1, step: 0.01, label: "Chaos" },
+    density: { min: 0, max: 1, step: 0.01, label: "Packed" },
+    symmetryBias: { min: 0, max: 1, step: 0.01, label: "Symmetry" },
+    glassRatio: { min: 0, max: 1, step: 0.01, label: "Glass" },
+    glassOpacity: { min: 0, max: 1, step: 0.01, label: "Glass Opa" },
+  },
+  "Color": {
+    baseHue: { min: 0, max: 360, step: 1, label: "Hue" },
+    baseSaturation: { min: 0, max: 1, step: 0.01, label: "Sat" },
+    baseBrightness: { min: 0, max: 1, step: 0.01, label: "Bright" },
+  },
+};
+
+const PRESETS = {
+  decon: { coreLevels: 6, coreWidth: 0.5, coreHeight: 0.5, coreDepth: 0.5, coreOffset: 0.7, cantileverCount: 0.7, cantileverScale: 0.6, slabCount: 0.6, slabScale: 0.6, verticalCount: 0.5, verticalHeight: 0.6, beamCount: 0.5, detailDensity: 0.7, balconyCount: 0.5, diagonalCount: 0.5, glassRatio: 0.4, wireframeDensity: 0.85, chaos: 0.75, verticality: 0.5, density: 0.6, symmetryBias: 0.15, baseHue: 0, baseSaturation: 0, baseBrightness: 0.88, glassOpacity: 0.25, environmentMood: "overcast" },
+  brutal: { coreLevels: 4, coreWidth: 0.7, coreHeight: 0.6, coreDepth: 0.7, coreOffset: 0.3, cantileverCount: 0.4, cantileverScale: 0.7, slabCount: 0.8, slabScale: 0.7, verticalCount: 0.3, verticalHeight: 0.4, beamCount: 0.7, detailDensity: 0.3, balconyCount: 0.3, diagonalCount: 0.2, glassRatio: 0.15, wireframeDensity: 0.3, chaos: 0.3, verticality: 0.4, density: 0.7, symmetryBias: 0.5, baseHue: 30, baseSaturation: 0.05, baseBrightness: 0.6, glassOpacity: 0.15, environmentMood: "overcast" },
+  metabol: { coreLevels: 7, coreWidth: 0.4, coreHeight: 0.4, coreDepth: 0.4, coreOffset: 0.6, cantileverCount: 0.85, cantileverScale: 0.5, slabCount: 0.4, slabScale: 0.4, verticalCount: 0.6, verticalHeight: 0.5, beamCount: 0.4, detailDensity: 0.6, balconyCount: 0.7, diagonalCount: 0.3, glassRatio: 0.35, wireframeDensity: 0.6, chaos: 0.55, verticality: 0.6, density: 0.7, symmetryBias: 0.25, baseHue: 0, baseSaturation: 0, baseBrightness: 0.85, glassOpacity: 0.3, environmentMood: "night" },
+  hightech: { coreLevels: 5, coreWidth: 0.45, coreHeight: 0.55, coreDepth: 0.45, coreOffset: 0.35, cantileverCount: 0.3, cantileverScale: 0.4, slabCount: 0.6, slabScale: 0.5, verticalCount: 0.8, verticalHeight: 0.8, beamCount: 0.8, detailDensity: 0.5, balconyCount: 0.2, diagonalCount: 0.7, glassRatio: 0.6, wireframeDensity: 0.7, chaos: 0.25, verticality: 0.7, density: 0.4, symmetryBias: 0.6, baseHue: 210, baseSaturation: 0.08, baseBrightness: 0.82, glassOpacity: 0.2, environmentMood: "night" },
+  parametric: { coreLevels: 6, coreWidth: 0.5, coreHeight: 0.5, coreDepth: 0.5, coreOffset: 0.5, cantileverCount: 0.6, cantileverScale: 0.5, slabCount: 0.7, slabScale: 0.6, verticalCount: 0.4, verticalHeight: 0.6, beamCount: 0.5, detailDensity: 0.85, balconyCount: 0.4, diagonalCount: 0.8, glassRatio: 0.65, wireframeDensity: 0.75, chaos: 0.6, verticality: 0.55, density: 0.7, symmetryBias: 0.3, baseHue: 195, baseSaturation: 0.06, baseBrightness: 0.85, glassOpacity: 0.3, environmentMood: "dawn" },
+  minimal: { coreLevels: 3, coreWidth: 0.6, coreHeight: 0.5, coreDepth: 0.6, coreOffset: 0.15, cantileverCount: 0.2, cantileverScale: 0.4, slabCount: 0.3, slabScale: 0.5, verticalCount: 0.3, verticalHeight: 0.4, beamCount: 0.2, detailDensity: 0.15, balconyCount: 0.15, diagonalCount: 0.1, glassRatio: 0.5, wireframeDensity: 0.4, chaos: 0.1, verticality: 0.5, density: 0.25, symmetryBias: 0.8, baseHue: 0, baseSaturation: 0, baseBrightness: 0.92, glassOpacity: 0.2, environmentMood: "fog" },
+};
+
+let currentGenome = { ...DEFAULT_GENOME };
+let generationCount = 0;
+let currentSeed = 42;
+let favorites = [];
+let sessionId = 'session_' + Date.now();
+
+// ======== RNG ========
+class RNG {
+  constructor(seed) { this.state = seed | 0; }
+  next() { this.state = (this.state * 1664525 + 1013904223) & 0xffffffff; return (this.state >>> 0) / 0xffffffff; }
+  range(a, b) { return a + this.next() * (b - a); }
+  irange(a, b) { return Math.floor(this.range(a, b + 1)); }
+  pick(arr) { return arr[this.irange(0, arr.length - 1)]; }
+  chance(p) { return this.next() < p; }
+}
+
+// ======== MOODS ========
+const MOODS = {
+  day:      { bg:[0.88,0.88,0.88], fog:[0.88,0.88,0.88], fogD:0.007, amb:0.7, dir:1.3, dirC:[1,1,0.97], bloom:0.03, ground:[0.82,0.82,0.82] },
+  dawn:     { bg:[0.75,0.6,0.55], fog:[0.75,0.6,0.55], fogD:0.01, amb:0.45, dir:1.0, dirC:[1,0.82,0.65], bloom:0.15, ground:[0.65,0.55,0.5] },
+  dusk:     { bg:[0.4,0.28,0.38], fog:[0.4,0.28,0.38], fogD:0.012, amb:0.3, dir:0.75, dirC:[1,0.55,0.35], bloom:0.2, ground:[0.35,0.28,0.3] },
+  night:    { bg:[0.06,0.06,0.1], fog:[0.06,0.06,0.1], fogD:0.018, amb:0.12, dir:0.25, dirC:[0.55,0.65,1], bloom:0.25, ground:[0.08,0.08,0.1] },
+  overcast: { bg:[0.7,0.71,0.73], fog:[0.7,0.71,0.73], fogD:0.009, amb:0.8, dir:0.45, dirC:[0.9,0.9,0.95], bloom:0.03, ground:[0.65,0.66,0.68] },
+  fog:      { bg:[0.8,0.8,0.8], fog:[0.8,0.8,0.8], fogD:0.03, amb:0.7, dir:0.35, dirC:[1,1,1], bloom:0.08, ground:[0.75,0.75,0.75] },
+};
+
+// ======== THREE.JS MAIN SCENE ========
+let scene, camera, renderer, controls, composer, bloomPass, buildingGroup, groundMesh, gridHelper;
+let ambientLight, dirLight;
+let rotating = true, autoRotateAngle = 0;
+let scaleVisible = false, scaleFigure;
+
+function initMain() {
+  const canvas = document.getElementById('main-canvas');
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 500);
+  camera.position.set(40, 28, 40);
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.target.set(0, 10, 0);
+
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambientLight);
+  dirLight = new THREE.DirectionalLight(0xffffff, 1.3);
+  dirLight.position.set(25, 45, 20);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.camera.near = 1; dirLight.shadow.camera.far = 120;
+  dirLight.shadow.camera.left = -40; dirLight.shadow.camera.right = 40;
+  dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -40;
+  dirLight.shadow.bias = -0.0005;
+  scene.add(dirLight);
+  scene.add(new THREE.DirectionalLight(0xddeeff, 0.35).translateX(-20).translateY(15));
+
+  const groundGeo = new THREE.PlaneGeometry(300, 300);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.95 });
+  groundMesh = new THREE.Mesh(groundGeo, groundMat);
+  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.receiveShadow = true;
+  scene.add(groundMesh);
+
+  gridHelper = new THREE.GridHelper(80, 80, 0xc5c5c5, 0xd2d2d2);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+
+  // Human scale figure (1.8m = 1.8 units)
+  const figGroup = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.6 }));
+  body.position.y = 0.7;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.6 }));
+  head.position.y = 1.55;
+  figGroup.add(body, head);
+  figGroup.position.set(12, 0, 0);
+  figGroup.visible = false;
+  scaleFigure = figGroup;
+  scene.add(scaleFigure);
+
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.03, 0.4, 0.85);
+  composer.addPass(bloomPass);
+  composer.addPass(new OutputPass());
+
+  buildingGroup = new THREE.Group();
+  scene.add(buildingGroup);
+
+  resizeMain();
+  window.addEventListener('resize', resizeMain);
+}
+
+function resizeMain() {
+  const wrap = document.getElementById('viewport-wrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (w === 0 || h === 0) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+}
+
+function applyMood(name) {
+  const m = MOODS[name] || MOODS.day;
+  scene.background = new THREE.Color(...m.bg);
+  scene.fog = new THREE.FogExp2(new THREE.Color(...m.fog), m.fogD);
+  ambientLight.intensity = m.amb;
+  dirLight.intensity = m.dir;
+  dirLight.color.setRGB(...m.dirC);
+  bloomPass.strength = m.bloom;
+  groundMesh.material.color.setRGB(...m.ground);
+  document.getElementById('info-mood').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// ======== BUILDING GENERATOR ========
+function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+
+function buildFromGenome(genome, seed = 42) {
+  const g = { ...DEFAULT_GENOME, ...genome };
+  const rng = new RNG(seed);
+  const group = new THREE.Group();
+
+  const hsl = { h: g.baseHue / 360, s: g.baseSaturation, l: g.baseBrightness };
+  const solidMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(hsl.h, hsl.s * 0.15, hsl.l),
+    roughness: 0.5, metalness: 0.08, side: THREE.DoubleSide
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(hsl.h, hsl.s * 0.1, hsl.l * 0.4),
+    roughness: 0.5, metalness: 0.15
+  });
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color().setHSL(hsl.h + 0.55, 0.05, 0.92),
+    roughness: 0.05, metalness: 0.1,
+    transmission: lerp(0.4, 0.9, 1 - g.glassOpacity),
+    thickness: 0.5, transparent: true, opacity: lerp(0.08, 0.45, g.glassOpacity),
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  const wireMat = new THREE.LineBasicMaterial({
+    color: new THREE.Color().setHSL(hsl.h, hsl.s * 0.08, 0.55),
+    transparent: true, opacity: lerp(0.2, 0.55, g.wireframeDensity)
+  });
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(hsl.h, hsl.s * 0.05, 0.55),
+    roughness: 0.3, metalness: 0.4
+  });
+  const thinWireMat = new THREE.LineBasicMaterial({
+    color: new THREE.Color().setHSL(hsl.h, hsl.s * 0.05, 0.65),
+    transparent: true, opacity: lerp(0.1, 0.35, g.wireframeDensity)
+  });
+
+  const cW = lerp(3, 14, g.coreWidth);
+  const cH = lerp(1.5, 6, g.coreHeight);
+  const cD = lerp(3, 14, g.coreDepth);
+  const vM = lerp(0.7, 1.8, g.verticality);
+
+  const numLevels = Math.round(g.coreLevels);
+  const coreBoxes = [];
+  for (let i = 0; i < numLevels; i++) {
+    const w = rng.range(cW * 0.5, cW);
+    const h = rng.range(cH * 0.5, cH) * vM;
+    const d = rng.range(cD * 0.5, cD);
+    const off = g.coreOffset * g.chaos * 4;
+    const x = rng.range(-off, off) * (1 - g.symmetryBias);
+    const z = rng.range(-off, off) * (1 - g.symmetryBias);
+    const y = i * lerp(2.5, 5, g.verticality) + h / 2;
+    coreBoxes.push({ x, y, z, w, h, d });
+
+    if (rng.chance(0.65)) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, rng.chance(g.glassRatio) ? glassMat : rng.chance(0.25) ? darkMat : solidMat);
+      mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    if (rng.chance(g.wireframeDensity)) {
+      const p = rng.range(0, 1.5) * g.chaos;
+      const wg = new THREE.BoxGeometry(w + p, h + p * 0.5, d + p);
+      const line = new THREE.LineSegments(new THREE.EdgesGeometry(wg), wireMat);
+      line.position.set(x + rng.range(-0.3, 0.3) * g.chaos, y, z + rng.range(-0.3, 0.3) * g.chaos);
+      group.add(line);
+    }
+    // Subdivision wireframe on face
+    if (rng.chance(g.wireframeDensity * g.density * 0.7)) {
+      const cols = rng.irange(2, 6), rows = rng.irange(2, 5);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const sw = w / cols, sh = h / rows;
+        const se = new THREE.EdgesGeometry(new THREE.BoxGeometry(sw * 0.92, sh * 0.92, d * 0.01));
+        const sl = new THREE.LineSegments(se, thinWireMat);
+        sl.position.set(x - w/2 + sw/2 + c*sw, y - h/2 + sh/2 + r*sh, z + d/2 + 0.05);
+        group.add(sl);
+      }
+    }
+    if (rng.chance(g.glassRatio * 0.6)) {
+      const gw = rng.range(1.5, w * 0.8), gh = rng.range(1, h * 0.8);
+      const gm = new THREE.Mesh(new THREE.BoxGeometry(gw, gh, 0.04), glassMat);
+      const face = rng.irange(0, 3);
+      gm.position.set(x, y, z);
+      if (face === 0) gm.position.z += d/2 + 0.05;
+      else if (face === 1) { gm.position.z -= d/2 + 0.05; gm.rotation.y = Math.PI; }
+      else if (face === 2) { gm.position.x += w/2 + 0.05; gm.rotation.y = Math.PI/2; }
+      else { gm.position.x -= w/2 + 0.05; gm.rotation.y = -Math.PI/2; }
+      group.add(gm);
+    }
+  }
+  if (coreBoxes.length === 0) coreBoxes.push({ x:0, y:5, z:0, w:5, h:4, d:5 });
+
+  // Cantilevers
+  const nCant = Math.round(lerp(2, 20, g.cantileverCount));
+  for (let i = 0; i < nCant; i++) {
+    const parent = rng.pick(coreBoxes);
+    const sc = lerp(0.5, 2, g.cantileverScale);
+    const w = rng.range(1.5, 5) * sc, h = rng.range(0.8, 2.5) * sc * vM, d = rng.range(1.5, 5) * sc;
+    const side = rng.irange(0, 3);
+    let x = parent.x, z = parent.z;
+    const ov = rng.range(0, 1.5) * g.chaos;
+    if (side===0) x += parent.w/2 + w/2 - ov;
+    else if (side===1) x -= parent.w/2 + w/2 - ov;
+    else if (side===2) z += parent.d/2 + d/2 - ov;
+    else z -= parent.d/2 + d/2 - ov;
+    const y = parent.y + rng.range(-2, 2) * g.chaos;
+    if (rng.chance(0.55)) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rng.chance(g.glassRatio) ? glassMat : solidMat);
+      mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    if (rng.chance(g.wireframeDensity * 0.8 + 0.2)) {
+      const line = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+0.2, h+0.2, d+0.2)), wireMat);
+      line.position.set(x, y, z);
+      group.add(line);
+    }
+  }
+
+  // Slabs
+  const nSlabs = Math.round(lerp(2, 12, g.slabCount));
+  const maxY = numLevels * lerp(2.5, 5, g.verticality);
+  for (let i = 0; i < nSlabs; i++) {
+    const sc = lerp(0.6, 1.8, g.slabScale);
+    const w = rng.range(5, 14) * sc, d = rng.range(5, 14) * sc;
+    const geo = new THREE.BoxGeometry(w, rng.range(0.06, 0.16), d);
+    const mesh = new THREE.Mesh(geo, rng.chance(g.glassRatio*0.4) ? glassMat : solidMat);
+    mesh.position.set(rng.range(-3,3)*g.chaos, rng.range(1, maxY), rng.range(-3,3)*g.chaos);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    group.add(mesh);
+    const el = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wireMat);
+    el.position.copy(mesh.position);
+    group.add(el);
+  }
+
+  // Verticals
+  const nV = Math.round(lerp(4, 25, g.verticalCount));
+  for (let i = 0; i < nV; i++) {
+    const h = rng.range(3, maxY * lerp(0.8, 1.5, g.verticalHeight));
+    const t = rng.range(0.02, 0.1);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(t, h, t), frameMat);
+    const sp = lerp(5, 12, g.density);
+    mesh.position.set(rng.range(-sp, sp), h/2, rng.range(-sp, sp));
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+
+  // Beams
+  const nB = Math.round(lerp(3, 18, g.beamCount));
+  for (let i = 0; i < nB; i++) {
+    const len = rng.range(3, 14), t = rng.range(0.02, 0.08);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, t, t), frameMat);
+    mesh.position.set(rng.range(-7,7), rng.range(2, maxY), rng.range(-7,7));
+    if (rng.chance(0.5)) mesh.rotation.y = Math.PI/2;
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+
+  // Details
+  const nD = Math.round(lerp(8, 50, g.detailDensity));
+  for (let i = 0; i < nD; i++) {
+    const sz = rng.range(0.2, 1.3) * lerp(0.5, 1.5, g.density);
+    const geo = new THREE.BoxGeometry(sz, sz * rng.range(0.3, 2.5) * vM, sz);
+    const sp = lerp(6, 13, g.density);
+    const pos = new THREE.Vector3(rng.range(-sp,sp), rng.range(0.5, maxY*1.1), rng.range(-sp,sp));
+    if (rng.chance(0.5)) {
+      const m = new THREE.Mesh(geo, rng.chance(g.glassRatio) ? glassMat : solidMat);
+      m.position.copy(pos); m.castShadow = true; group.add(m);
+    }
+    if (rng.chance(g.wireframeDensity)) {
+      const l = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wireMat);
+      l.position.set(pos.x + rng.range(-1,1)*g.chaos, pos.y, pos.z + rng.range(-1,1)*g.chaos);
+      group.add(l);
+    }
+  }
+
+  // Balconies
+  const nBal = Math.round(lerp(2, 16, g.balconyCount));
+  for (let i = 0; i < nBal; i++) {
+    const p = rng.pick(coreBoxes);
+    const bw = rng.range(1.5, 5), bd = rng.range(0.8, 3);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.08, bd), solidMat);
+    const side = rng.irange(0, 3);
+    mesh.position.set(p.x, p.y + rng.range(-1.5, 1.5), p.z);
+    if (side===0) mesh.position.z += p.d/2 + bd/2;
+    else if (side===1) mesh.position.z -= p.d/2 + bd/2;
+    else if (side===2) mesh.position.x += p.w/2 + bd/2;
+    else mesh.position.x -= p.w/2 + bd/2;
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    group.add(mesh);
+    if (rng.chance(0.7)) {
+      const rh = rng.range(0.4, 1.2);
+      const rl = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(bw, rh, bd)), wireMat);
+      rl.position.copy(mesh.position); rl.position.y += rh/2;
+      group.add(rl);
+      const nR = rng.irange(3, 8);
+      for (let j = 0; j < nR; j++) {
+        const rm = new THREE.Mesh(new THREE.BoxGeometry(0.02, rh, 0.02), frameMat);
+        rm.position.set(mesh.position.x - bw/2 + (j/(nR-1))*bw, mesh.position.y + rh/2, mesh.position.z);
+        group.add(rm);
+      }
+    }
+  }
+
+  // Diagonals
+  const nDiag = Math.round(lerp(1, 12, g.diagonalCount));
+  for (let i = 0; i < nDiag; i++) {
+    const sp = lerp(5, 10, g.density);
+    const pts = [
+      new THREE.Vector3(rng.range(-sp,sp), rng.range(0,2), rng.range(-sp,sp)),
+      new THREE.Vector3(rng.range(-sp,sp), rng.range(6, maxY), rng.range(-sp,sp))
+    ];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat));
+  }
+
+  // Window panels
+  const nPan = Math.round(lerp(2, 8, g.density * g.wireframeDensity));
+  for (let i = 0; i < nPan; i++) {
+    const p = rng.pick(coreBoxes);
+    const rows = rng.irange(2, 6), cols = rng.irange(3, 8);
+    const cellW = rng.range(0.5, 1.0), cellH = rng.range(0.4, 0.9), gap = rng.range(0.04, 0.1);
+    const panW = cols * (cellW + gap), panH = rows * (cellH + gap);
+    const pg = new THREE.Group();
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const cg = new THREE.PlaneGeometry(cellW, cellH);
+      const cell = new THREE.Mesh(cg, rng.chance(g.glassRatio) ? glassMat : solidMat);
+      cell.position.set(c*(cellW+gap) - panW/2 + cellW/2, r*(cellH+gap) - panH/2 + cellH/2, 0);
+      pg.add(cell);
+      if (rng.chance(g.wireframeDensity * 0.8)) {
+        const fl = new THREE.LineSegments(new THREE.EdgesGeometry(cg), thinWireMat);
+        fl.position.copy(cell.position); pg.add(fl);
+      }
+    }
+    const face = rng.irange(0, 3);
+    pg.position.set(p.x, p.y, p.z);
+    if (face===0) pg.position.z += p.d/2 + 0.08;
+    else if (face===1) { pg.position.z -= p.d/2 + 0.08; pg.rotation.y = Math.PI; }
+    else if (face===2) { pg.position.x += p.w/2 + 0.08; pg.rotation.y = Math.PI/2; }
+    else { pg.position.x -= p.w/2 + 0.08; pg.rotation.y = -Math.PI/2; }
+    group.add(pg);
+  }
+
+  return group;
+}
+
+// ======== SCENE MANAGEMENT ========
+function clearGroup(grp) {
+  while (grp.children.length > 0) {
+    const ch = grp.children[0]; grp.remove(ch);
+    ch.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    });
+  }
+}
+
+function rebuildMain() {
+  clearGroup(buildingGroup);
+  const building = buildFromGenome(currentGenome, currentSeed);
+  buildingGroup.add(building);
+  applyMood('night');
+  document.getElementById('mood-select').value = currentGenome.environmentMood || 'day';
+  document.getElementById('gen-badge').textContent = `Gen ${generationCount}`;
+  document.getElementById('seed-badge').textContent = `Seed ${currentSeed}`;
+  let objCount = 0;
+  building.traverse(() => objCount++);
+  document.getElementById('info-objects').textContent = `${objCount} objects`;
+}
+
+// ======== ANIMATION ========
+function animate() {
+  requestAnimationFrame(animate);
+  if (rotating) {
+    autoRotateAngle += 0.0012;
+    const r = 46;
+    camera.position.x = Math.cos(autoRotateAngle) * r;
+    camera.position.z = Math.sin(autoRotateAngle) * r;
+    camera.position.y = 24 + Math.sin(autoRotateAngle * 0.3) * 6;
+    camera.lookAt(0, 12, 0);
+  }
+  controls.update();
+  composer.render();
+}
+
+// ======== EVOLUTION ========
+let evoGenomes = [{},{},{},{}];
+let evoSelected = new Set();
+let evoRenderers = [], evoScenes = [], evoCameras = [];
+
+function initEvoGrid() {
+  document.querySelectorAll('.evo-cell canvas').forEach((canvas, i) => {
+    const r = new THREE.WebGLRenderer({ canvas, antialias: true });
+    r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    const s = new THREE.Scene();
+    s.background = new THREE.Color(0.08, 0.08, 0.09);
+    const c = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+    c.position.set(24, 18, 24); c.lookAt(0, 8, 0);
+    s.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dl = new THREE.DirectionalLight(0xffffff, 1);
+    dl.position.set(15, 30, 10); s.add(dl);
+    evoRenderers.push(r); evoScenes.push(s); evoCameras.push(c);
+  });
+}
+
+function renderEvoCell(i) {
+  const r = evoRenderers[i], canvas = r.domElement;
+  const p = canvas.parentElement, w = p.clientWidth, h = p.clientHeight;
+  if (w === 0 || h === 0) return;
+  r.setSize(w, h); evoCameras[i].aspect = w/h; evoCameras[i].updateProjectionMatrix();
+  r.render(evoScenes[i], evoCameras[i]);
+}
+
+function populateEvoGrid() {
+  evoSelected.clear();
+  document.querySelectorAll('.evo-cell').forEach(c => c.classList.remove('selected'));
+  for (let i = 0; i < 4; i++) {
+    evoGenomes[i] = mutateGenome(currentGenome, 0.4);
+    const s = evoScenes[i];
+    while (s.children.length > 2) { const c = s.children[s.children.length-1]; s.remove(c); c.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); }); }
+    s.add(buildFromGenome(evoGenomes[i], Math.floor(Math.random()*99999)));
+    renderEvoCell(i);
+  }
+}
+
+function toggleEvoSelect(i) {
+  if (evoSelected.has(i)) { evoSelected.delete(i); document.querySelector(`.evo-cell[data-idx="${i}"]`).classList.remove('selected'); }
+  else { evoSelected.add(i); document.querySelector(`.evo-cell[data-idx="${i}"]`).classList.add('selected'); }
+}
+
+function breedSelected() {
+  const parents = [...evoSelected].map(i => evoGenomes[i]);
+  if (parents.length < 1) return;
+  generationCount++;
+  const child = {};
+  const keys = Object.keys(DEFAULT_GENOME);
+  for (const k of keys) {
+    if (k === 'environmentMood') { child[k] = parents[Math.floor(Math.random()*parents.length)][k] || 'day'; continue; }
+    const p = parents[Math.floor(Math.random()*parents.length)];
+    child[k] = p[k] !== undefined ? p[k] : DEFAULT_GENOME[k];
+  }
+  currentGenome = mutateGenome(child, 0.15);
+  currentSeed = Math.floor(Math.random()*999999);
+  updateSliders(); rebuildMain(); populateEvoGrid();
+  addChatMessage('system', `Generation ${generationCount} bred from ${parents.length} parent(s)`);
+}
+
+function mutateGenome(genome, strength) {
+  const m = { ...genome };
+  for (const [groupName, sliders] of Object.entries(GENOME_GROUPS)) {
+    for (const [k, r] of Object.entries(sliders)) {
+      if (Math.random() < strength) {
+        const delta = (r.max - r.min) * (Math.random() - 0.5) * strength * 2;
+        let v = (m[k] || DEFAULT_GENOME[k]) + delta;
+        v = Math.max(r.min, Math.min(r.max, v));
+        if (r.step >= 1) v = Math.round(v);
+        m[k] = v;
+      }
+    }
+  }
+  return m;
+}
+
+// ======== SLIDERS ========
+function buildSliders() {
+  const panel = document.getElementById('genome-panel');
+  panel.innerHTML = '';
+  for (const [groupName, sliders] of Object.entries(GENOME_GROUPS)) {
+    const div = document.createElement('div');
+    div.className = 'slider-group';
+    div.innerHTML = `<div class="slider-group-title">${groupName}</div>`;
+    for (const [key, range] of Object.entries(sliders)) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const val = currentGenome[key] ?? DEFAULT_GENOME[key];
+      row.innerHTML = `<span class="slider-label">${range.label}</span><input type="range" min="${range.min}" max="${range.max}" step="${range.step}" value="${val}" data-key="${key}"><span class="slider-val">${Number(val).toFixed(range.step < 1 ? 2 : 0)}</span>`;
+      const input = row.querySelector('input');
+      input.addEventListener('input', () => {
+        const v = parseFloat(input.value);
+        currentGenome[key] = v;
+        input.nextElementSibling.textContent = v.toFixed(range.step < 1 ? 2 : 0);
+        rebuildMain();
+      });
+      div.appendChild(row);
+    }
+    panel.appendChild(div);
+  }
+}
+
+function updateSliders() {
+  document.querySelectorAll('#genome-panel input[type="range"]').forEach(input => {
+    const k = input.dataset.key;
+    let range;
+    for (const g of Object.values(GENOME_GROUPS)) if (g[k]) { range = g[k]; break; }
+    if (!range) return;
+    input.value = currentGenome[k] ?? DEFAULT_GENOME[k];
+    input.nextElementSibling.textContent = Number(input.value).toFixed(range.step < 1 ? 2 : 0);
+  });
+}
+
+// ======== AI CHAT ========
+function addChatMessage(role, text) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendChat(message) {
+  if (!message.trim()) return;
+  addChatMessage('user', message);
+  document.getElementById('chat-input').value = '';
+  addChatMessage('system', '...');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, genome: currentGenome, sessionId })
+    });
+
+    // Remove loading indicator
+    const msgs = document.getElementById('chat-messages');
+    const loading = msgs.querySelector('.chat-msg.system:last-child');
+    if (loading && loading.textContent === '...') msgs.removeChild(loading);
+
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const data = await res.json();
+
+    if (data.message) addChatMessage('ai', data.message);
+    if (data.genome) {
+      delete data.genome.description;
+      currentGenome = { ...DEFAULT_GENOME, ...data.genome };
+      currentSeed = Math.floor(Math.random() * 999999);
+      generationCount++;
+      updateSliders(); rebuildMain(); populateEvoGrid();
+    }
+  } catch (err) {
+    addChatMessage('system', `Error: ${err.message}`);
+  }
+}
+
+async function requestCritique() {
+  addChatMessage('system', 'Requesting critique...');
+  try {
+    const res = await fetch('/api/critique', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ genome: currentGenome })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const data = await res.json();
+    if (data.critique) addChatMessage('ai', data.critique);
+    if (data.genome) {
+      addChatMessage('system', 'Applied AI improvements — click to view');
+      // Store improved genome but don't auto-apply
+      window._suggestedGenome = data.genome;
+    }
+  } catch (err) {
+    addChatMessage('system', `Error: ${err.message}`);
+  }
+}
+
+// ======== BATCH / GALLERY ========
+let galleryItems = [];
+
+async function batchGenerate() {
+  const btn = document.getElementById('btn-batch');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Generating...';
+  const prompt = document.getElementById('chat-input').value || '';
+
+  try {
+    const res = await fetch('/api/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, count: 8 })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const genomes = await res.json();
+
+    galleryItems = genomes.map((g, i) => ({
+      genome: { ...DEFAULT_GENOME, ...g },
+      seed: Math.floor(Math.random() * 999999),
+      name: g.description || `Variant ${i + 1}`,
+      favorited: false
+    }));
+    delete galleryItems.forEach(item => delete item.genome.description);
+
+    renderGallery();
+    addChatMessage('system', `Generated ${genomes.length} variants`);
+  } catch (err) {
+    addChatMessage('system', `Batch error: ${err.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Batch';
+  }
+}
+
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  grid.innerHTML = '';
+
+  galleryItems.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = `gallery-card${item.favorited ? ' favorited' : ''}`;
+
+    const canvas = document.createElement('canvas');
+    card.appendChild(canvas);
+
+    const info = document.createElement('div');
+    info.className = 'gallery-card-info';
+    info.innerHTML = `
+      <span class="gallery-card-name">${item.name.slice(0, 30)}</span>
+      <div class="gallery-card-actions">
+        <button class="card-btn ${item.favorited ? 'fav-active' : ''}" onclick="event.stopPropagation(); toggleFavorite(${idx})" title="Save">&#9734;</button>
+        <button class="card-btn" onclick="event.stopPropagation(); exportCardGLTF(${idx})" title="Export">&#8595;</button>
+      </div>
+    `;
+    card.appendChild(info);
+
+    card.addEventListener('click', () => {
+      currentGenome = { ...item.genome };
+      currentSeed = item.seed;
+      generationCount++;
+      updateSliders(); rebuildMain(); populateEvoGrid();
+      setView('single');
+      addChatMessage('system', `Loaded: ${item.name}`);
+    });
+
+    grid.appendChild(card);
+
+    // Render thumbnail
+    requestAnimationFrame(() => renderGalleryThumb(canvas, item));
+  });
+}
+
+function renderGalleryThumb(canvas, item) {
+  const r = new THREE.WebGLRenderer({ canvas, antialias: true });
+  r.setPixelRatio(1);
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  const w = canvas.parentElement.clientWidth || 240;
+  r.setSize(w, w);
+
+  const s = new THREE.Scene();
+  s.background = new THREE.Color(0.08, 0.08, 0.09);
+  const c = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+  c.position.set(28, 20, 28); c.lookAt(0, 10, 0);
+  s.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dl = new THREE.DirectionalLight(0xffffff, 1);
+  dl.position.set(15, 30, 10); s.add(dl);
+  s.add(buildFromGenome(item.genome, item.seed));
+  r.render(s, c);
+  r.dispose();
+}
+
+function toggleFavorite(idx) {
+  galleryItems[idx].favorited = !galleryItems[idx].favorited;
+  if (galleryItems[idx].favorited) {
+    favorites.push({ ...galleryItems[idx] });
+    renderFavorites();
+  }
+  renderGallery();
+}
+
+function renderFavorites() {
+  const list = document.getElementById('favorites-list');
+  if (favorites.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9734;</div><div class="empty-state-text">No saved buildings yet</div></div>';
+    return;
+  }
+  list.innerHTML = '';
+  favorites.forEach((fav, i) => {
+    const item = document.createElement('div');
+    item.className = 'fav-item';
+    item.innerHTML = `<div class="fav-thumb"></div><div class="fav-name">${fav.name.slice(0, 25)}</div>`;
+    item.addEventListener('click', () => {
+      currentGenome = { ...fav.genome };
+      currentSeed = fav.seed;
+      generationCount++;
+      updateSliders(); rebuildMain(); populateEvoGrid();
+      setView('single');
+    });
+    list.appendChild(item);
+  });
+}
+
+// ======== VIEW MANAGEMENT ========
+function setView(mode) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+  document.getElementById('viewport-wrap').style.display = mode === 'single' ? 'block' : 'none';
+  document.getElementById('gallery-wrap').style.display = mode === 'gallery' ? 'block' : 'none';
+  if (mode === 'single') requestAnimationFrame(resizeMain);
+  if (mode === 'gallery' && galleryItems.length === 0) {
+    // Show empty prompt
+    document.getElementById('gallery-grid').innerHTML = '<div class="empty-state" style="grid-column:1/-1;min-height:300px"><div class="empty-state-icon">&#9633;</div><div class="empty-state-text">Click Generate Batch to create variants<br>Or type a prompt in the chat first</div></div>';
+  }
+}
+
+function setTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === name));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
+}
+
+// ======== CONTROLS ========
+function toggleRotation() {
+  rotating = !rotating;
+  if (!rotating) controls.target.set(0, 12, 0);
+}
+
+function setMood(mood) {
+  currentGenome.environmentMood = mood;
+  applyMood(mood);
+}
+
+function setCameraPreset(preset) {
+  rotating = false;
+  controls.target.set(0, 10, 0);
+  if (preset === 'orbit') { rotating = true; return; }
+  if (preset === 'eye') { camera.position.set(30, 1.7, 0); }
+  if (preset === 'top') { camera.position.set(0, 60, 0.01); }
+  if (preset === 'front') { camera.position.set(0, 12, 40); }
+  controls.update();
+}
+
+function toggleScale() {
+  scaleVisible = !scaleVisible;
+  scaleFigure.visible = scaleVisible;
+}
+
+function toggleLeftPanel() {
+  document.getElementById('left-panel').classList.toggle('collapsed');
+  requestAnimationFrame(resizeMain);
+}
+
+function toggleRightPanel() {
+  document.getElementById('right-panel').classList.toggle('collapsed');
+  requestAnimationFrame(resizeMain);
+}
+
+function randomGenome() {
+  const rng = new RNG(Math.floor(Math.random() * 999999));
+  for (const [gn, sliders] of Object.entries(GENOME_GROUPS))
+    for (const [k, r] of Object.entries(sliders)) {
+      currentGenome[k] = rng.range(r.min, r.max);
+      if (r.step >= 1) currentGenome[k] = Math.round(currentGenome[k]);
+    }
+  currentGenome.environmentMood = ['day','dawn','dusk','night','overcast','fog'][Math.floor(Math.random()*6)];
+  currentSeed = Math.floor(Math.random() * 999999);
+  generationCount++;
+  updateSliders(); rebuildMain(); populateEvoGrid();
+  addChatMessage('system', 'Random genome generated');
+}
+
+function loadPreset(name) {
+  if (PRESETS[name]) {
+    currentGenome = { ...DEFAULT_GENOME, ...PRESETS[name] };
+    currentSeed = Math.floor(Math.random() * 999999);
+    generationCount++;
+    updateSliders(); rebuildMain(); populateEvoGrid();
+    addChatMessage('system', `Loaded preset: ${name}`);
+  }
+}
+
+// ======== EXPORT ========
+function exportScreenshot() {
+  composer.render();
+  const link = document.createElement('a');
+  link.download = `arch_gen${generationCount}_${currentSeed}.png`;
+  link.href = renderer.domElement.toDataURL('image/png');
+  link.click();
+}
+
+function exportGLTF() {
+  const exporter = new GLTFExporter();
+  exporter.parse(buildingGroup, (gltf) => {
+    const blob = new Blob([JSON.stringify(gltf)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.download = `building_gen${generationCount}_${currentSeed}.gltf`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    addChatMessage('system', 'GLTF exported');
+  }, undefined, { binary: false });
+}
+
+function exportCardGLTF(idx) {
+  const item = galleryItems[idx];
+  const building = buildFromGenome(item.genome, item.seed);
+  const exporter = new GLTFExporter();
+  exporter.parse(building, (gltf) => {
+    const blob = new Blob([JSON.stringify(gltf)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.download = `building_${item.seed}.gltf`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, undefined, { binary: false });
+}
+
+// ======== INPUT HANDLING ========
+document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat(e.target.value);
+  }
+});
+
+// ======== INIT ========
+initMain();
+buildSliders();
+initEvoGrid();
+rebuildMain();
+populateEvoGrid();
+animate();
+
+// Expose to window
+Object.assign(window, {
+  toggleEvoSelect, breedSelected, populateEvoGrid, randomGenome, loadPreset,
+  setView, setTab, setMood, setCameraPreset, toggleRotation, toggleScale,
+  toggleLeftPanel, toggleRightPanel, exportScreenshot, exportGLTF, exportCardGLTF,
+  batchGenerate, toggleFavorite, requestCritique, sendChat
+});
+</script>
+</body>
+</html>
