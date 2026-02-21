@@ -4,6 +4,9 @@ AI-powered procedural architecture generator. Describe a building in natural lan
 
 Built with Three.js and Claude.
 
+<img width="1616" height="1626" alt="image" src="https://github.com/user-attachments/assets/1a30bf33-8108-4a13-afc6-d5c448c25be0" />
+
+
 ## FEATURES
 
 **AI ARCHITECT** — Describe buildings in plain text. Claude interprets architectural intent into a 25-parameter genome that drives the procedural generator. Conversational refinement: "make it more brutalist", "add floating glass terraces", "go full metabolism".
